@@ -1,0 +1,43 @@
+[CmdletBinding()]
+param([string]$ClientDll, [string]$ViGEmMsi, [string]$DjiDriverDirectory, [switch]$Test)
+$ErrorActionPreference = 'Stop'
+$root = $PSScriptRoot
+$compiler = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+if (!(Test-Path -LiteralPath $compiler)) { throw 'Serve il compilatore .NET Framework su Windows x64.' }
+$out = Join-Path $root 'dist'
+New-Item -ItemType Directory -Force -Path $out | Out-Null
+$exe = Join-Path $out 'DJI-RC-N3-FPV-Portable.exe'
+$source = Get-ChildItem -LiteralPath (Join-Path $root 'src') -Filter '*.cs' |
+    Sort-Object Name | Select-Object -ExpandProperty FullName
+$notice = Join-Path $root 'THIRD-PARTY-NOTICES.txt'
+$resources = @("/resource:$notice,Notices")
+if ($ClientDll) {
+    $dll = (Resolve-Path -LiteralPath $ClientDll).Path
+    $resources += "/resource:$dll,ViGEmClient"
+} else { Write-Warning 'Diagnostica senza uscita Xbox. Passa -ClientDll per la build completa.' }
+if ($ViGEmMsi -or $DjiDriverDirectory) {
+    if (!$ClientDll -or !$ViGEmMsi -or !$DjiDriverDirectory) {
+        throw 'Per includere i driver servono -ClientDll, -ViGEmMsi e -DjiDriverDirectory.'
+    }
+    $msi = (Resolve-Path -LiteralPath $ViGEmMsi).Path
+    $inf = (Resolve-Path -LiteralPath (Join-Path $DjiDriverDirectory 'vcom_driver11.inf')).Path
+    $cat = (Resolve-Path -LiteralPath (Join-Path $DjiDriverDirectory 'vcom_driver.cat')).Path
+    foreach ($package in @($msi, $cat)) {
+        if ((Get-AuthenticodeSignature -FilePath $package).Status -ne 'Valid') {
+            throw "Firma driver non valida per $package."
+        }
+    }
+    $resources += "/resource:$msi,ViGEmSetup", "/resource:$inf,SerialInf", "/resource:$cat,SerialCat"
+}
+& $compiler /nologo /codepage:65001 /target:winexe /platform:x64 /optimize+ /warnaserror+ "/out:$exe" @resources @source
+if ($LASTEXITCODE -ne 0) { throw 'Compilazione non riuscita.' }
+if ($Test) {
+    $testExe = Join-Path $out 'SmokeTests.exe'
+    $testSource = Join-Path $root 'tests\SmokeTests.cs'
+    & $compiler /nologo /codepage:65001 /target:exe /platform:x64 /optimize+ /warnaserror+ /main:RcN3.SmokeTests "/out:$testExe" @resources @source $testSource
+    if ($LASTEXITCODE -ne 0) { throw 'Compilazione dei test non riuscita.' }
+    & $testExe
+    if ($LASTEXITCODE -ne 0) { throw 'Test non riusciti.' }
+}
+Get-FileHash -LiteralPath $exe
+

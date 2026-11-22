@@ -1,0 +1,72 @@
+# DJI RC-N3 FPV for Windows
+
+Bridge USB indipendente per usare il DJI RC-N3 nei simulatori civili. Puoi scegliere un controller virtuale Xbox 360 (XInput) oppure un joystick RC generico (HID/DirectInput). App desktop Windows x64 in C# e Windows Forms.
+
+## Uso
+
+1. Apri `DJI-RC-N3-FPV-Portable.exe` da una cartella scrivibile. Collega il radiocomando acceso.
+2. Se manca un driver, usa **Driver…**. Nella build portabile con driver, Windows può chiedere l'autorizzazione amministrativa. La build del repository apre le pagine ufficiali dei driver.
+3. Scegli **Uscita** e premi **Applica e salva**. **Xbox 360** usa ViGEmBus. **RC generico** usa vJoy x64.
+4. Usa **Calibra…** per acquisire centro ed estremi. Seleziona **Mappa tasti…** per associare i quattro pulsanti DJI alle azioni Xbox.
+5. Verifica il controller con **Test Windows**, poi assegna roll, pitch, yaw e throttle nel simulatore.
+
+**Gestisci…** raccoglie i profili in ordine alfabetico. Puoi attivarli, duplicarli, rinominarli, eliminarli o fare un backup XML. L'importazione conserva i profili esistenti e aggiunge un suffisso ai nomi duplicati. La mappatura dei tasti è salvata insieme alle impostazioni degli assi, alla calibrazione e alla frequenza richiesta. I profili precedenti mantengono le assegnazioni A, B, X e Y.
+
+I dati locali sono salvati in `DJI-RC-N3-FPV-Portable.profiles.xml` accanto all'app. Usa **Crea EXE con profili…** per trasferirli in un solo eseguibile. Nella cartella di destinazione un eventuale XML con lo stesso nome ha precedenza sui profili incorporati. L'avvio con Windows è un'opzione del singolo account. La chiusura della finestra lascia l'app attiva nell'area di notifica. **Esci** termina il bridge.
+
+## Selettore fisico C/N/S
+
+Apri **Selettore C/N/S…**. Porta la leva del radiocomando su ciascuna posizione e premi **Acquisisci** sulla riga corrispondente. Assegna un profilo oppure scegli **Usa profilo manuale**. I tre codici devono essere distinti. C, N e S significano Cine, Normal e Sport.
+
+La commutazione richiede dati recenti dal radiocomando. I profili assegnati devono usare la stessa uscita del profilo manuale, così il simulatore mantiene il controller virtuale. Se manca un abbinamento valido, il bridge usa il profilo manuale. Il pannello principale mostra la posizione e il profilo in uso. I profili Xbox e RC generico possono essere selezionati dal menu **Uscita**.
+
+Il decoding dei due bit di modalità segue osservazioni pubbliche sul RC-N1C. Il wizard acquisisce i codici osservati sull'unità collegata, senza assumere l'ordine delle tre posizioni.
+
+## Uscita RC generico
+
+Installa [vJoy x64 per Windows 10/11](https://github.com/SciFi-Bob/vJoy_uni/releases) se non è presente. Configura un dispositivo libero con assi X, Y, Rx, Ry e almeno quattro pulsanti. Rz è facoltativo per la rotella. L'app usa la DLL x64 installata insieme al driver, dalla cartella standard di vJoy in Programmi, e cerca un dispositivo libero con la configurazione richiesta.
+
+L'uscita RC riusa l'assegnazione e la calibrazione del profilo. I quattro tasti fisici diventano i pulsanti joystick 1–4. **Mappa tasti** riguarda l'uscita Xbox. La scelta dell'uscita si salva nel profilo e si conserva negli export. Il dispositivo vJoy può restare visibile a Windows anche quando l'app lo ha rilasciato.
+
+## Frequenza e precisione
+
+**Richieste/s** imposta il ritmo delle richieste USB su 25, 50, 100, 125, 150, 200 o 250 al secondo. Le frequenze sopra 100 sono sperimentali. **frame/s** indica i campioni validi ricevuti dal bridge. **Intervallo P95** indica il 95º percentile dell'intervallo di ricezione nella finestra mobile degli ultimi 128 intervalli. La misura riguarda il PC e il collegamento USB. La latenza completa del simulatore richiede una misura dedicata.
+
+**Misura USB…** confronta 100, 125, 150, 200 e 250 richieste in finestre brevi. Durante il test l’uscita Xbox è neutralizzata. Al termine viene ripristinato il profilo in uso. Il contatore indica richieste senza risposta corrispondente entro 45 ms dall’invio. Il bridge limita a due le richieste degli stick simultaneamente in attesa. Una risposta USB valida può ripetere lo stesso valore fisico.
+
+Il bridge attiva la modalità simulatore del protocollo all'apertura della porta. La modifica della frequenza non cambia firmware, clock o risoluzione del radiocomando. Usa calibrazione, deadzone ed expo per regolare la risposta degli assi.
+
+## Opzioni da riga di comando
+
+```powershell
+.\DJI-RC-N3-FPV-Portable.exe --profile "FPV lineare"
+.\DJI-RC-N3-FPV-Portable.exe --port COM3
+.\DJI-RC-N3-FPV-Portable.exe --background
+.\DJI-RC-N3-FPV-Portable.exe --disabled
+.\DJI-RC-N3-FPV-Portable.exe --help
+```
+
+## Build e test
+
+Esegui da PowerShell su Windows x64 con .NET Framework 4.8 e il compilatore di sistema.
+
+```powershell
+.\build.ps1 -Test
+.\build.ps1 -Test -ClientDll "C:\percorso\ViGEmClient.dll"
+```
+
+Il primo comando compila senza client ViGEm e verifica parser, assi, pulsanti, profili, layout del report vJoy e temporizzazione. Il secondo incorpora il client nativo x64 per l'uscita Xbox. Il client è disponibile dal progetto [ViGEmClient](https://github.com/nefarius/ViGEmClient). I driver usati dall'app sono [ViGEmBus](https://github.com/nefarius/ViGEmBus/releases/latest) e il driver USB di [DJI Assistant 2](https://www.dji.com/downloads/softwares/dji-assistant-2-consumer-drones-series). ViGEmBus è archiviato a monte.
+
+Per una build locale autocontenuta, `build.ps1` accetta anche `-ViGEmMsi` e `-DjiDriverDirectory`. Passa l'MSI x64 firmato e la cartella che contiene `vcom_driver11.inf` e `vcom_driver.cat`. La build verifica le firme del pacchetto MSI e del catalogo. Per pubblicare sorgenti e build su GitHub, lascia i pacchetti driver fuori dal repository e controlla i termini applicabili prima di distribuire un eseguibile che li incorpora.
+
+## GitHub
+
+Il workflow Windows compila e avvia i test in modalità diagnostica a ogni push e pull request. Il repository contiene i sorgenti e gli avvisi sui componenti terzi. Prima di pubblicarlo, aggiungi la licenza che vuoi concedere per il tuo codice.
+
+## Crediti
+
+- [DJI RC-N3 Joystick macOS](https://github.com/gladiusxosmium/DJI-RC-N3-Joystick_MACOS) e [dji-rc-n3](https://github.com/eraycn/dji-rc-n3) per i riferimenti del protocollo.
+- [ViGEmBus](https://github.com/nefarius/ViGEmBus) e [ViGEmClient](https://github.com/nefarius/ViGEmClient) per il controller virtuale.
+
+
+- [vJoy Uni](https://github.com/SciFi-Bob/vJoy_uni) per l’uscita joystick HID. Driver e DLL vJoy sono installati a parte.
